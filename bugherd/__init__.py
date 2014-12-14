@@ -6,6 +6,8 @@ import json, time
 from requests.auth import HTTPBasicAuth
 # import sys
 import collections
+import json
+import time
 
 API_BASE_URL = 'http://www.bugherd.com/api_v2/{api}'
 
@@ -30,10 +32,41 @@ class BaseAPI(object):
         # if self.token:
         # kwargs.setdefault('params', {})['token'] = self.token
 
+        if 'data' in kwargs and (type(kwargs['data']) == type(dict()) or type(kwargs['data']) == type(collections.defaultdict())):
+            kwargs['data'] = json.dumps(kwargs['data'], sort_keys=True, indent=4)
+
+        if 'headers' not in kwargs:
+            kwargs['headers'] = dict()
+        kwargs['headers']['Content-Type'] = 'application/json'
+
+        try:
+            kwargs['proxies'] = self.proxies
+        except KeyError:
+            pass
+
+        if self.debug:
+            print "%s %s" % (method.__name__.upper(), api)
+            print
+            if 'data' in kwargs:
+                print kwargs['data']
+
         response = method(API_BASE_URL.format(api=api), auth=HTTPBasicAuth(self.api_key, 'x'),
                           **kwargs)
 
-        assert response.status_code == 200
+        if response.status_code == 429:
+            time.sleep(3.0)
+            response = method(API_BASE_URL.format(api=api), auth=HTTPBasicAuth(self.api_key, 'x'),
+                              **kwargs)
+
+
+        if self.debug:
+            print "Response: %s" % response.status_code
+            print
+            # if response.json():
+            #     print json.dumps(response.json(), sort_keys=True, indent=4)
+            print response.text
+
+        assert response.status_code >= 200 and response.status_code <= 299
 
         response = Response(response.text)
         # if not response.successful:
@@ -41,11 +74,14 @@ class BaseAPI(object):
         # return response
         return response.body
 
-    def get(self, api, **kwargs):
+    def _get(self, api, **kwargs):
         return self._request(requests.get, api, **kwargs)
 
-    def post(self, api, **kwargs):
+    def _post(self, api, **kwargs):
         return self._request(requests.post, api, **kwargs)
+
+    def _delete(self, api, **kwargs):
+        return self._request(requests.delete, api, **kwargs)
 
 
 # Usage Examples
@@ -70,7 +106,7 @@ class BugHerd(BaseAPI):
         self.debug = debug
 
 
-    def project(self, project_id):
+    def project(self, project_id=None):
         return Project(self.api_key, project_id, self.debug)
 
     # Get more detail of your account.
@@ -78,33 +114,25 @@ class BugHerd(BaseAPI):
 
     # GET /api_v2/organization.json
     def organization(self):
-        return self.get('organization.json')
+        return self._get('organization.json')
 
     # Get a list of all projects within your account.
     #
-
-    # GET /api_v2/projects.json
-    def projects(self):
-        return self.get('projects.json')
-
-    # GET /api_v2/projects/active.json
-    def projects_active(self):
-        return self.get('projects/active.json')
 
     # See all the people in your account.
     #
 
     # GET /api_v2/users.json
     def users(self):
-        return self.get('users.json')
+        return self._get('users.json')
 
     # GET /api_v2/users/members.json
     def members(self):
-        return self.get('users/members.json')
+        return self._get('users/members.json')
 
     # GET /api_v2/users/guests.json
     def guests(self):
-        return self.get('users/guests.json')
+        return self._get('users/guests.json')
 
 # bh = BugHerd(api_key)
 # project = bh.Project()
@@ -114,24 +142,41 @@ class BugHerd(BaseAPI):
 # project.show()
 # project.update??
 class Project(BaseAPI):
-    def __init__(self, api_key, project_id, debug=False):
+    def __init__(self, api_key, project_id=None, debug=False):
         self.api_key = api_key
         self.project_id = project_id
         self.id = project_id
+        self.debug = debug
+        self.proxies = {
+            'http': 'http://imac:8080',
+        }
+
+
+    # GET /api_v2/projects.json
+    def list(self):
+        return self._get('projects.json')
+
+    # GET /api_v2/projects/active.json
+    def list_active(self):
+        return self._get('projects/active.json')
+
+
 
     # Show details for a specific project. Note: if you'd like to see the tasks in the project, refer to section 'List tasks'.
     #
     # GET /api_v2/projects/#{project_id}.json
     def details(self):
-        return self.get('projects/%s.json' % self.project_id)
+        if not self.project_id:
+            raise Exception
+        return self._get('projects/%s.json' % self.project_id)
 
 
 
     # List details of a task in a given project, includes all data including comments, attachments, etc.
     #
     # GET /api_v2/projects/#{project_id}/tasks/#{task_id}.json
-    def task(self, task_id):
-        return Task(self.api_key, self.project_id, self.task_id, self.debug)
+    def task(self, task_id=None):
+        return Task(self.api_key, self.project_id, task_id, self.debug)
 
 
     # Create a new project. The project will initially have no members.
@@ -146,9 +191,20 @@ class Project(BaseAPI):
     #   "is_active":true,
     #   "is_public":false
     # }}
-    def create(self, name, devurl, is_active=None, is_public=None):
-        # TODO: implement
-        pass
+    def create(self, name, devurl, is_active=True, is_public=False):
+        if not name or not devurl:
+            raise Exception
+        tree = lambda: collections.defaultdict(tree)
+        data = tree()
+        data['project']['name'] = name
+        if devurl:
+            data['project']['devurl'] = devurl
+        # if is_active:
+        data['project']['is_active'] = is_active
+        # if is_public:
+        data['project']['is_public'] = is_public
+        return self._post('projects.json', data=data)
+
 
     # Add a member to a project.
     #
@@ -169,9 +225,14 @@ class Project(BaseAPI):
     #
     # {"user_id":123}
     # {"email":"someone@example.com"}
-    def add_guest(self, user_id, email):
-        # TODO: implement
-        pass
+    def add_guest(self, user_id=None, email=None):
+        url = "projects/%s/add_guest.json" % (self.project_id)
+        data = dict()
+        if user_id:
+            data['user_id'] = user_id
+        if email:
+            data['email'] = email
+        return self._post(url, data=data)
 
     # Update settings for an existing project under your control (ie: only the ones you own).
     #
@@ -190,8 +251,9 @@ class Project(BaseAPI):
     #
     # DELETE /api_v2/projects/#{project_id}.json
     def delete(self):
-        # TODO: implement
-        pass
+        if not self.project_id:
+            raise Exception
+        return self._delete('projects/%s.json' % self.project_id)
 
 
 # task = bh.project(123).Task()
@@ -200,14 +262,19 @@ class Project(BaseAPI):
 # task = bh.project(123).Task(123)
 # task.id
 # task.update??
-# task.show()
+# task.detail()
 
 class Task(BaseAPI):
-    def __init__(self, api_key, project_id, task_id, debug=False):
+    def __init__(self, api_key, project_id, task_id=None, debug=False):
         self.api_key = api_key
         self.project_id = project_id
         self.id = task_id
         self.task_id = task_id
+        self.proxies = {
+            'http': 'http://imac:8080',
+        }
+        self.debug = debug
+        # self.debug = True
 
     # Get a full list of tasks for a project, including archived tasks.
     #
@@ -217,10 +284,10 @@ class Task(BaseAPI):
     # You can filter tasks using the following GET parameters: updated_since, created_since, status, priority, tag, assigned_to_id and external_id. Examples on how to use filters are below:
     def list(self):
         # TODO: implement filter
-        return self.get("projects/%s/tasks.json" % (self.url, self.project_id))
+        return self._get("projects/%s/tasks.json" % (self.project_id))
 
-    def show(self):
-        url = "%s/projects/%s/tasks/%s.json" % (self.url, self.project_id, self.task_id)
+    def detail(self):
+        url = "projects/%s/tasks/%s.json" % (self.project_id, self.task_id)
         return self._get(url)
 
     # POST /api_v2/projects/#{project_id}/tasks.json
@@ -251,13 +318,14 @@ class Task(BaseAPI):
     #
     # External ID is an API-only field. It cannot be set from the BugHerd application, only using the API. An external ID can be used to track originating IDs from other systems in BugHerd bugs.
     def create(self, description=None, requester_id=None, assigned_to_id=None, status=None, priority=None, tags=None):
-        if not description or not requester_id:
-            raise Exception
-        url = "%s/projects/%s/tasks.json" % (self.url, self.project_id)
+        # if not description or not requester_id:
+        #     raise Exception
+        url = "projects/%s/tasks.json" % (self.project_id)
         tree = lambda: collections.defaultdict(tree)
         data = tree()
         data['task']['description'] = description
-        data['task']['requester_id'] = requester_id
+        if requester_id:
+            data['task']['requester_id'] = requester_id
         if assigned_to_id:
             data['task']['assigned_to_id'] = assigned_to_id
         if tags:
@@ -268,7 +336,7 @@ class Task(BaseAPI):
             data['task']['priority'] = priority
         # data['task']['external_id'] = "testing"
 
-        return self._post(url, data)
+        return self._post(url, data=data)
 
     # Update one of the tasks in a project.
     #
@@ -378,17 +446,17 @@ class Comments(BaseAPI):
     def create_comment(self, project_id, task_id, comment, user_id):
         if not project_id or not task_id or not comment or not user_id:
             raise Exception
-        url = "%s/projects/%s/tasks/%s/comments.json" % (self.url, project_id, task_id)
+        url = "projects/%s/tasks/%s/comments.json" % (project_id, task_id)
         tree = lambda: collections.defaultdict(tree)
         data = tree()
         data['comment']['text'] = comment
         data['comment']['user_id'] = user_id
-        return self._post(url, data)
+        return self._post(url, data=data)
 
 
 # class Webhook(BaseAPI):
 #     def list_webhooks(self):
-#         return self.get('webhooks.json')
+#         return self._get('webhooks.json')
 #
 #     def create_webhook(self, target_url, event, project_id=None):
 #         url = "%s/webhooks.json" % (self.url)
@@ -408,9 +476,3 @@ class Comments(BaseAPI):
 #         url = "%s/projects/%s/tasks/%s/comments.json" % (self.url, project_id, task_id)
 #         return self._get(url)
 
-
-
-
-    # bh.list_comments(project_id, 1687761)
-    # results = bh.list_tasks(project_id)
-    # print len(results['tasks'])

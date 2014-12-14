@@ -355,8 +355,8 @@ class Comments(BaseAPI):
     #
     # GET /api_v2/projects/#{project_id}/tasks/#{task_id}/comments.json
 
-    def list_comments(self):
-        pass
+    # def list_comments(self):
+    #     pass
 
 
     # Adds a new comment to the specified task.
@@ -386,49 +386,31 @@ class Comments(BaseAPI):
         return self._post(url, data)
 
 
-class Webhook(BaseAPI):
-    def list_webhooks(self):
-        return self.get('webhooks.json')
+# class Webhook(BaseAPI):
+#     def list_webhooks(self):
+#         return self.get('webhooks.json')
+#
+#     def create_webhook(self, target_url, event, project_id=None):
+#         url = "%s/webhooks.json" % (self.url)
+#         tree = lambda: collections.defaultdict(tree)
+#         data = tree()
+#         if project_id:
+#             data['project_id'] = project_id
+#         data['target_url'] = target_url
+#         data['event'] = event
+#         return self._post(url, data)
+#
+#     def delete_webhooks(self, webhook_id):
+#         url = "%s/webhooks/%s.json" % (self.url, webhook_id)
+#         return self._delete(url)
+#
+#     def list_comments(self, project_id, task_id):
+#         url = "%s/projects/%s/tasks/%s/comments.json" % (self.url, project_id, task_id)
+#         return self._get(url)
 
-    def create_webhook(self, target_url, event, project_id=None):
-        url = "%s/webhooks.json" % (self.url)
-        tree = lambda: collections.defaultdict(tree)
-        data = tree()
-        if project_id:
-            data['project_id'] = project_id
-        data['target_url'] = target_url
-        data['event'] = event
-        return self._post(url, data)
-
-    def delete_webhooks(self, webhook_id):
-        url = "%s/webhooks/%s.json" % (self.url, webhook_id)
-        return self._delete(url)
-
-    def list_comments(self, project_id, task_id):
-        url = "%s/projects/%s/tasks/%s/comments.json" % (self.url, project_id, task_id)
-        return self._get(url)
 
 
-def main():
-    bh = BugHerd('sqpauk9fi9fk1qcvv0svdg', True)
-    # bh.list_webhooks()
-    # bh.delete_webhooks(3814)
-    project_id = 56250
-    # users = bh.list_users()
-    projects = bh.projects()
-    project_id = projects['projects'][0]['id']
-    # for project in projects['projects']:
-    #     print "%s:%s" % (project['id'], project['name'])
-    # pass
-    print project_id
-    # project = bh.project(project_id)
-    # pprint(project.details())
-    pprint(bh.project(project_id).details())
 
     # bh.list_comments(project_id, 1687761)
     # results = bh.list_tasks(project_id)
     # print len(results['tasks'])
-
-
-if __name__ == "__main__":
-    main()

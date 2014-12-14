@@ -148,7 +148,7 @@ class Project(BaseAPI):
         self.id = project_id
         self.debug = debug
         self.proxies = {
-            'http': 'http://imac:8080',
+            # 'http': 'http://imac:8080',
         }
 
 
@@ -271,7 +271,7 @@ class Task(BaseAPI):
         self.id = task_id
         self.task_id = task_id
         self.proxies = {
-            'http': 'http://imac:8080',
+            # 'http': 'http://imac:8080',
         }
         self.debug = debug
         # self.debug = True
@@ -416,6 +416,9 @@ class Task(BaseAPI):
 #
 # DELETE /api_v2/projects/#{project_id}/tasks/#{task_id}/attachments/#{id}.json
 #
+
+
+
 
 class Comments(BaseAPI):
     pass

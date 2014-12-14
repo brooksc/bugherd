@@ -16,20 +16,13 @@ class TestSequenceFunctions(unittest.TestCase):
 
 
     def test_a_testOrganization(self):
-    # def test_organization(self):
-    #     print "test_a_testOrganization"
-        # organization
         results = self.bh.organization()
         assert(results['organization']['id'] == ORGANIZATION_ID)
-        # pprint(results)
 
     # record the number of projects before create project is run
-    # def test_a_recordProjectList(self):
-    #     # print "test_a_recordProjectList"
-    #     self.__class__.project_list = self.bh.project().list()
-    #     # print len(self.__class__.project_list)
-    #     self.__class__.project_list_active = self.bh.project().list_active()
-    #     # print len(self.__class__.project_list_active)
+    def test_a_recordProjectList(self):
+        self.__class__.project_list = self.bh.project().list()
+        self.__class__.project_list_active = self.bh.project().list_active()
 
     # create a project we'll use for tests
     def test_b_createProject(self):
@@ -46,24 +39,21 @@ class TestSequenceFunctions(unittest.TestCase):
         self.__class__.project_id = results['project']['id']
 
     # Check that one more projects exists now than before
-    # def test_c_checkProjectList(self):
-    #     # print "test_c_checkProjectList"
-    #     self.__class__.project_list2 = self.bh.project().list()
-    #     # print len(self.__class__.project_list2)
-    #     self.__class__.project_list_active2 = self.bh.project().list_active()
-    #     # print len(self.__class__.project_list_active2)
-    #     project_list = self.__class__.project_list['projects']
-    #     project_list_active = self.__class__.project_list_active['projects']
-    #     project_list2 = self.__class__.project_list2['projects']
-    #     project_list_active2 = self.__class__.project_list_active2['projects']
-    #     assert(len(project_list)+1 == len(project_list2))
-    #     assert(len(project_list_active)+1 == len(project_list_active2))
+    def test_c_checkProjectList(self):
+        self.__class__.project_list2 = self.bh.project().list()
+        self.__class__.project_list_active2 = self.bh.project().list_active()
+        project_list = self.__class__.project_list['projects']
+        project_list_active = self.__class__.project_list_active['projects']
+        project_list2 = self.__class__.project_list2['projects']
+        project_list_active2 = self.__class__.project_list_active2['projects']
+        assert(len(project_list)+1 == len(project_list2))
+        assert(len(project_list_active)+1 == len(project_list_active2))
 
     # Check if project details are the same as created
     # def test_d_projectDetails(self):
-    #     results = self.bh.project(self.__class__.project_id).details()
-    #     assert(results['project']['name'] == self.__class__.name)
-    #     assert(results['project']['devurl'] == self.__class__.devurl)
+        results = self.bh.project(self.__class__.project_id).details()
+        assert(results['project']['name'] == self.__class__.name)
+        assert(results['project']['devurl'] == self.__class__.devurl)
 
 
     # Project:
@@ -110,26 +100,7 @@ class TestSequenceFunctions(unittest.TestCase):
         self.bh.project(self.__class__.project_id).delete()
 
 
-    # def test_shuffle(self):
-    #     # make sure the shuffled sequence does not lose any elements
-    #     random.shuffle(self.seq)
-    #     self.seq.sort()
-    #     self.assertEqual(self.seq, range(10))
-    #
-    #     # should raise an exception for an immutable sequence
-    #     self.assertRaises(TypeError, random.shuffle, (1,2,3))
-    #
-    # def test_choice(self):
-    #     element = random.choice(self.seq)
-    #     self.assertTrue(element in self.seq)
-    #
-    # def test_sample(self):
-    #     with self.assertRaises(ValueError):
-    #         random.sample(self.seq, 20)
-    #     for element in random.sample(self.seq, 5):
-    #         self.assertTrue(element in self.seq)
-
 if __name__ == '__main__':
     unittest.main()
     suite = unittest.TestLoader().loadTestsFromTestCase(TestSequenceFunctions)
-    unittest.TextTestRunner(verbosity=2).run(suite)
+    unittest.TextTestRunner(verbosity=9).run(suite)

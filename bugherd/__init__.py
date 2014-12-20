@@ -31,7 +31,11 @@ class BaseAPI(object):
     def _request(self, method, api, **kwargs):
         # if self.token:
         # kwargs.setdefault('params', {})['token'] = self.token
-
+        if 'page' in kwargs:
+            page_num = kwargs['page']
+            del kwargs['page']
+        else:
+            page_num = 1
         if 'data' in kwargs and (type(kwargs['data']) == type(dict()) or type(kwargs['data']) == type(collections.defaultdict())):
             kwargs['data'] = json.dumps(kwargs['data'], sort_keys=True, indent=4)
 
@@ -50,29 +54,39 @@ class BaseAPI(object):
             if 'data' in kwargs:
                 print kwargs['data']
 
-        response = method(API_BASE_URL.format(api=api), auth=HTTPBasicAuth(self.api_key, 'x'),
+        requests_response = method(API_BASE_URL.format(api=api), auth=HTTPBasicAuth(self.api_key, 'x'),
                           **kwargs)
 
-        if response.status_code == 429:
+        if requests_response.status_code == 429:
             time.sleep(3.0)
-            response = method(API_BASE_URL.format(api=api), auth=HTTPBasicAuth(self.api_key, 'x'),
+            requests_response = method(API_BASE_URL.format(api=api), auth=HTTPBasicAuth(self.api_key, 'x'),
                               **kwargs)
 
 
+        assert requests_response.status_code >= 200 and requests_response.status_code <= 299
+
+        response = Response(requests_response.text)
+        try:
+            response.page = 1
+            response.pages = int(response.body['meta']['count'])/100 + 1
+            response.paged = True
+        except KeyError:
+            # print "No tasks found"
+            # print response.body.keys()
+            response.paged = False
+            response.page = 1
+            response.pages = 1
+
         if self.debug:
-            print "Response: %s" % response.status_code
+            print "Response: %s" % requests_response.status_code
             print
-            # if response.json():
-            #     print json.dumps(response.json(), sort_keys=True, indent=4)
-            print response.text
+            if requests_response.json():
+                print json.dumps(requests_response.json(), sort_keys=True, indent=4)
 
-        assert response.status_code >= 200 and response.status_code <= 299
-
-        response = Response(response.text)
-        # if not response.successful:
-        #     raise Error(response.error)
-        # return response
-        return response.body
+        # if not requests_response.successful:
+        #     raise Error(requests_response.error)
+        # return requests_response
+        return response
 
     def _get(self, api, **kwargs):
         return self._request(requests.get, api, **kwargs)
@@ -275,6 +289,7 @@ class Task(BaseAPI):
         }
         self.debug = debug
         # self.debug = True
+        # print "works!"
 
     # Get a full list of tasks for a project, including archived tasks.
     #
@@ -282,9 +297,18 @@ class Task(BaseAPI):
     #
     #
     # You can filter tasks using the following GET parameters: updated_since, created_since, status, priority, tag, assigned_to_id and external_id. Examples on how to use filters are below:
-    def list(self):
+    # def list(self, status=None):
+    def list(self, **kwargs):
         # TODO: implement filter
-        return self._get("projects/%s/tasks.json" % (self.project_id))
+        url = "projects/%s/tasks.json" % (self.project_id)
+        for k in ['updated_since','created_since','status','priority','tag','assigned_to_id','external_id']:
+            if k in kwargs:
+                url += "?%s=%s" % (k, kwargs[k])
+                break
+            # else:
+            #     print "Error: Task.list() Unknown argument %s" % k
+        # print url
+        return self._get(url)
 
     def detail(self):
         url = "projects/%s/tasks/%s.json" % (self.project_id, self.task_id)

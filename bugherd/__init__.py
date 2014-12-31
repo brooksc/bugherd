@@ -94,6 +94,10 @@ class BaseAPI(object):
     def _post(self, api, **kwargs):
         return self._request(requests.post, api, **kwargs)
 
+    def _put(self, api, **kwargs):
+        return self._request(requests.put, api, **kwargs)
+
+
     def _delete(self, api, **kwargs):
         return self._request(requests.delete, api, **kwargs)
 
@@ -301,7 +305,7 @@ class Task(BaseAPI):
     def list(self, **kwargs):
         # TODO: implement filter
         url = "projects/%s/tasks.json" % (self.project_id)
-        for k in ['updated_since','created_since','status','priority','tag','assigned_to_id','external_id']:
+        for k in ['updated_since','created_since','status','priority','tag','assigned_to_id','external_id','page']:
             if k in kwargs:
                 url += "?%s=%s" % (k, kwargs[k])
                 break
@@ -388,8 +392,9 @@ class Task(BaseAPI):
     # Moving a task back to feedback:
     #
     # {"task":{"status_id":null}}
-    def update(self):
-        pass
+    def update(self, data):
+        url = "projects/%s/tasks/%s.json" % (self.project_id, self.task_id)
+        return self._put(url, data=data)
 
 # attachments = bh.Project(123).Task(456).attachments
 # attachments.list()
